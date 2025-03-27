@@ -1,4 +1,4 @@
-import { Request, RequestHandler, Response } from "express";
+import { Request, Response } from "express";
 import isEmail from "validator/lib/isEmail"; // Using validator library for email validation
 import { prisma } from "../../config";
 import bcrypt from "bcryptjs";
@@ -81,8 +81,7 @@ export const register = async (req: Request, res: Response) => {
 
     // Save unverified email in session for later use (secure server-side storage)
     customSession.unverifiedEmail = email;
-     res.status(403).json({ message: "Verification email resent!" });
-     return;
+     res.status(201).json({ message: "Verification email sent!" });
   } catch (error: any) {
     // Log the error for internal debugging
     console.error("Registration error:", error);

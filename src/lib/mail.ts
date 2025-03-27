@@ -1,8 +1,7 @@
 
 import { Resend } from "resend";
-import { resendKey } from "../config";
 
-const resend = new Resend(resendKey);
+const resend = new Resend(process.env.RESEND_API_KEY);
 export const mail = async (
   email: string,
   subject: string,

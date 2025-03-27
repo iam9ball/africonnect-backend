@@ -25,6 +25,9 @@ import { subscriptionCheck } from "./middleware/subscription.middleware";
 import { dynamicHugoProxy } from "./middleware/hugoProxy.middleware";
 import { RedisStore } from "connect-redis";
 import session from "express-session";
+import { refreshToken } from "./helper/refereshToken";
+import { authenticateJWT } from "./middleware/auth.middleware";
+import passport from "./config/passport";
 
 
 const app = express();
@@ -38,7 +41,24 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", process.env.APP_URL!],
+      },
+    },
+    hsts: {
+      maxAge: 63072000, // 2 years
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
 app.use(morgan("dev"));
 
 
@@ -63,8 +83,18 @@ app.use(
 );
 
 
+// // app.ts
+// app.use(authenticateJWT); // -----> only on protected routes
+// app.use(refreshToken); // After auth middleware
+
+
+
+// Initialize Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
 // // API Routes
 app.use("/auth", authRoutes);
+// New current user endpoint - protected route
 // app.use("/merchants", merchantRoutes);
 // app.use("/products", productRoutes);
 // app.use("/orders", orderRoutes);

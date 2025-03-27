@@ -9,13 +9,13 @@ import { generateJWT } from "../../helper/generateJWT";
 // if url is from register redirect to login, if from login give jwt and redirect to default login url e.g dashboard
 export const verifyEmail = async (req: Request, res: Response) => {
   try {
-    const { token, source } = req.query;
+    const { token, callbackUrl } = req.query;
     if (!token) {
-       res.status(400).json({ error: "Missing token!" });
+       res.status(401).json({ error: "Missing token!" });
        return;
     }
     if (typeof token !== "string") {
-       res.status(400).json({ error: "Invalid token!" });
+       res.status(401).json({ error: "Invalid token!" });
        return;
     }
 
@@ -30,7 +30,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
     if (!user) {
        res
-        .status(400)
+        .status(401)
         .json({ error: "Token is invalid or has expired!" });
         return;
     }
@@ -52,22 +52,26 @@ export const verifyEmail = async (req: Request, res: Response) => {
     customSession.unverifiedEmail = null;
 
     // Decide what to do based on the source query parameter
-    if (source === "register") {
+
+    let redirectUrl;
+    if (callbackUrl === "register") {
       // After registration, redirect to login page
         res.status(200).json({
-         message: "Email verified! Redirecting to login.",
-         redirectUrl: "/login",
+         message: "Email verified! Redirecting to login."
+        
        });
-       return;
+        redirectUrl = "/login";
+      
      
     } else {
       // For login flow: Generate JWT, set it in an HTTP-only cookie, and redirect to dashboard
+        redirectUrl = "/dashboard"
          generateJWT(user.id, res);
         res.status(200).json({
-         message: "Email verified! Redirecting to dashboard.",
-         redirectUrl: "/dashboard",
-       });
-       return;
+          message: "Email verified! Redirecting to dashboard.",
+          redirectUrl //------> client handle redirect
+        });
+       
     }
 
    
@@ -93,21 +97,24 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     // Get the unverified email from the session
     const email = customSession.unverifiedEmail;
     if (!email) {
-      return res
+       res
         .status(400)
         .json({
           error: "No email found. Please register again!",
         });
+        return;
     }
 
     // Find the user by email
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(400).json({ error: "User not found!" });
+       res.status(404).json({ error: "User not found!" });
+       return;
     }
 
     if (user.emailVerified) {
-      return res.status(400).json({ error: "Email already registered!" });
+       res.status(409).json({ error: "Email already registered!" });
+       return;
     }
 
     // Check if the token is still valid; if not, generate a new one
@@ -131,9 +138,10 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     let _r = await redisClient.get(redisKey);
     const attempt = _r ? parseInt(_r) : 0;
     if (attempt >= RATE_LIMIT_MAX) {
-      return res
+       res
         .status(429)
         .json({ error: "Too many requests. Please try again later!" });
+        return;
     }
 
     // Increment the counter. If this is the first attempt, set the expiry.
@@ -145,11 +153,13 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     // Resend the verification email using the existing token
     await sendVerificationMail(email, tokenToSend, "register");
 
-    return res
-      .status(403)
+     res
+      .status(200)
       .json({ message: "Verification email resent!" });
+  
   } catch (error: any) {
     console.error("Resend verification error:", error);
-    return res.status(500).json({ error: "Internal server error!" });
+     res.status(500).json({ error: "Internal server error!" });
+     return;
   }
 };
